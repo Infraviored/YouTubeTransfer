@@ -3,16 +3,19 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 import time
 import logging
+import os
 
 
 class ChannelSubscriber:
     def __init__(self):
         self.driver = None
         self.BUTTON_WAIT_TIME = 10
-        self.DELAY_BETWEEN_CHANNELS = 1
+        self.DELAY_BETWEEN_CHANNELS = 0.5
 
         # Configure logging
         logging.basicConfig(
@@ -21,9 +24,45 @@ class ChannelSubscriber:
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
 
+    def find_chrome_binary(self):
+        """Find Chrome binary location on the system."""
+        possible_locations = [
+            "/opt/google/chrome/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/google-chrome",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium",
+            "/snap/bin/chromium",
+            "/usr/local/bin/chrome",
+            "/opt/google/chrome/chrome",
+        ]
+        
+        for location in possible_locations:
+            if os.path.isfile(location) or os.path.islink(location):
+                # Resolve symlinks to actual binary
+                try:
+                    real_path = os.path.realpath(location)
+                    if os.path.isfile(real_path):
+                        print(f"Found Chrome at: {real_path}")
+                        return real_path
+                except Exception:
+                    # If realpath fails, try the original location
+                    print(f"Found Chrome at: {location}")
+                    return location
+        
+        return None
+
     def get_secure_driver(self):
         """Create a new Chrome driver with all security bypasses."""
         options = Options()
+        
+        # Set Chrome binary location
+        chrome_binary = self.find_chrome_binary()
+        if chrome_binary:
+            options.binary_location = chrome_binary
+        else:
+            print("Warning: Could not find Chrome binary. Trying default location...")
+        
         # Basic options
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -35,6 +74,16 @@ class ChannelSubscriber:
         options.add_argument("--disable-features=IsolateOrigins,site-per-process")
         options.add_argument("--disable-site-isolation-trials")
         options.add_argument("--disable-gpu")
+
+        # Performance optimizations - disable heavy content loading
+        options.add_argument("--blink-settings=imagesEnabled=false")
+        options.add_argument("--disable-images")
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.default_content_setting_values.media_stream": 2,
+            "profile.managed_default_content_settings.media_stream": 2,
+        }
+        options.add_experimental_option("prefs", prefs)
 
         # Window options
         options.add_argument("--start-maximized")
@@ -49,7 +98,14 @@ class ChannelSubscriber:
         )
         options.add_experimental_option("useAutomationExtension", False)
 
-        self.driver = webdriver.Chrome(options=options)
+        # Use webdriver-manager to automatically download and manage the correct ChromeDriver
+        try:
+            service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            print(f"Error with webdriver-manager: {e}")
+            print("Falling back to system ChromeDriver...")
+            self.driver = webdriver.Chrome(options=options)
 
         # Additional stealth settings
         self.driver.execute_cdp_cmd(
@@ -109,16 +165,12 @@ class ChannelSubscriber:
     def wait_for_button(self):
         """Wait for the subscribe button to be present on the page."""
         try:
-            # Wait for any subscribe button (subscribed or not)
-            subscribe_button = WebDriverWait(self.driver, self.BUTTON_WAIT_TIME).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "ytd-subscribe-button-renderer")
+            # Wait for subscribe button to be clickable - YouTube updated selector
+            WebDriverWait(self.driver, self.BUTTON_WAIT_TIME).until(
+                EC.element_to_be_clickable(
+                    (By.CSS_SELECTOR, "yt-subscribe-button-view-model button")
                 )
             )
-
-            # Ensure the button is visible
-            WebDriverWait(self.driver, 5).until(EC.visibility_of(subscribe_button))
-            time.sleep(2)  # Small delay to allow animation to load
             return True
         except TimeoutException:
             print("Button not found in time.")
@@ -127,17 +179,17 @@ class ChannelSubscriber:
     def subscribe(self, channel_name):
         """Attempt to subscribe to a YouTube channel."""
         try:
-            # First find the button container
+            # First find the button container - YouTube updated selector
             button_container = WebDriverWait(self.driver, self.BUTTON_WAIT_TIME).until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "ytd-subscribe-button-renderer")
+                    (By.CSS_SELECTOR, "yt-subscribe-button-view-model")
                 )
             )
 
-            # Find the button text element
+            # Find the button text element - updated selector path
             button_text = (
                 button_container.find_element(
-                    By.CSS_SELECTOR, "yt-formatted-string.ytd-subscribe-button-renderer"
+                    By.CSS_SELECTOR, "div.yt-spec-button-shape-next__button-text-content"
                 )
                 .text.strip()
                 .lower()
@@ -192,7 +244,7 @@ class ChannelSubscriber:
                         EC.element_to_be_clickable((By.XPATH, selector))
                     )
                     break
-                except:
+                except Exception:
                     continue
 
             if not language_item:
@@ -241,9 +293,9 @@ class ChannelSubscriber:
 
             print("\n" + "=" * 58)
             print("Ready to start subscribing:")
-            print(f"✓ Logged in successfully")
-            print(f"✓ Language set to English")
-            print(f"✓ Found {total_active} channels to process")
+            print("[+] Logged in successfully")
+            print("[+] Language set to English")
+            print(f"[+] Found {total_active} channels to process")
             print("=" * 58)
 
             input("\nPress Enter to start subscribing to channels...")

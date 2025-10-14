@@ -3,6 +3,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import time
 import os
@@ -13,9 +15,45 @@ class ChannelExtractor:
     def __init__(self):
         self.driver = None
 
+    def find_chrome_binary(self):
+        """Find Chrome binary location on the system."""
+        possible_locations = [
+            "/opt/google/chrome/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/google-chrome",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium",
+            "/snap/bin/chromium",
+            "/usr/local/bin/chrome",
+            "/opt/google/chrome/chrome",
+        ]
+        
+        for location in possible_locations:
+            if os.path.isfile(location) or os.path.islink(location):
+                # Resolve symlinks to actual binary
+                try:
+                    real_path = os.path.realpath(location)
+                    if os.path.isfile(real_path):
+                        print(f"Found Chrome at: {real_path}")
+                        return real_path
+                except:
+                    # If realpath fails, try the original location
+                    print(f"Found Chrome at: {location}")
+                    return location
+        
+        return None
+
     def get_secure_driver(self):
         """Create a new Chrome driver with all security bypasses."""
         options = Options()
+        
+        # Set Chrome binary location
+        chrome_binary = self.find_chrome_binary()
+        if chrome_binary:
+            options.binary_location = chrome_binary
+        else:
+            print("Warning: Could not find Chrome binary. Trying default location...")
+        
         # Basic options
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
@@ -27,6 +65,16 @@ class ChannelExtractor:
         options.add_argument("--disable-features=IsolateOrigins,site-per-process")
         options.add_argument("--disable-site-isolation-trials")
         options.add_argument("--disable-gpu")
+
+        # Performance optimizations - disable heavy content loading
+        options.add_argument("--blink-settings=imagesEnabled=false")
+        options.add_argument("--disable-images")
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.default_content_setting_values.media_stream": 2,
+            "profile.managed_default_content_settings.media_stream": 2,
+        }
+        options.add_experimental_option("prefs", prefs)
 
         # Window options
         options.add_argument("--start-maximized")
@@ -41,7 +89,14 @@ class ChannelExtractor:
         )
         options.add_experimental_option("useAutomationExtension", False)
 
-        self.driver = webdriver.Chrome(options=options)
+        # Use webdriver-manager to automatically download and manage the correct ChromeDriver
+        try:
+            service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            print(f"Error with webdriver-manager: {e}")
+            print("Falling back to system ChromeDriver...")
+            self.driver = webdriver.Chrome(options=options)
 
         # Additional stealth settings
         self.driver.execute_cdp_cmd(

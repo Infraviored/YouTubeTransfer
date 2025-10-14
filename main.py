@@ -8,6 +8,17 @@ def main():
     print("\n" + "-" * 58)
     print("Welcome to YouTubeTransfer!")
     print("-" * 58)
+    print("\nThis tool helps you transfer YouTube channel subscriptions")
+    print("between accounts in two phases:")
+    print("")
+    print("Phase 1: Extract channels from your OLD account")
+    print("  - You will login to your OLD YouTube account")
+    print("  - The tool saves your subscribed channels to a file")
+    print("")
+    print("Phase 2: Subscribe to channels with your NEW account")
+    print("  - You will login to your NEW YouTube account")
+    print("  - The tool automatically subscribes to the channels")
+    print("-" * 58)
 
     # Check for existing YouTube.html file
     downloads_dir = os.path.expanduser("~/Downloads")
@@ -37,10 +48,24 @@ def main():
                 print("No channels found in file. Please generate a new one.")
                 return
         else:
+            print("\n" + "=" * 58)
+            print("PHASE 1: Extracting channels from OLD account")
+            print("=" * 58)
+            print("\nIMPORTANT: You will now login to your OLD YouTube account")
+            print("to extract the list of subscribed channels.")
+            print("")
+            input("Press Enter when ready to continue...")
             print("\nGenerating new channels file...")
             channels = None
     else:
-        print("\nNo existing channels file found. Will generate new one.")
+        print("\n" + "=" * 58)
+        print("PHASE 1: Extracting channels from OLD account")
+        print("=" * 58)
+        print("\nIMPORTANT: You will now login to your OLD YouTube account")
+        print("to extract the list of subscribed channels.")
+        print("")
+        input("Press Enter when ready to continue...")
+        print("\nGenerating new channels file...")
         choice = "N"
         channels = None
 
@@ -61,7 +86,15 @@ def main():
             return
 
     if channels:
-        print("\nStarting subscription phase...")
+        print("\n" + "=" * 58)
+        print("PHASE 2: Subscribing with NEW account")
+        print("=" * 58)
+        print("\nChannel extraction complete!")
+        print("You can now review and select which channels to subscribe to.")
+        print("")
+        print("In the next step, you will login to your NEW YouTube account")
+        print("to subscribe to the selected channels.")
+        print("-" * 58)
         # Menu loop
         while True:
             display_channels(channels)
