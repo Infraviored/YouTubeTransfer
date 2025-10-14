@@ -69,10 +69,15 @@ class ChannelExtractor:
         # Performance optimizations - disable heavy content loading
         options.add_argument("--blink-settings=imagesEnabled=false")
         options.add_argument("--disable-images")
+        options.add_argument("--autoplay-policy=document-user-activation-required")
+        options.add_argument("--mute-audio")
         prefs = {
             "profile.managed_default_content_settings.images": 2,
             "profile.default_content_setting_values.media_stream": 2,
             "profile.managed_default_content_settings.media_stream": 2,
+            "profile.default_content_setting_values.media_stream_mic": 2,
+            "profile.default_content_setting_values.media_stream_camera": 2,
+            "profile.default_content_setting_values.sound": 2,
         }
         options.add_experimental_option("prefs", prefs)
 
